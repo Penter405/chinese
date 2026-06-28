@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>114-2 職二段三手寫複習系統</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .menu-section {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.active {
+            background-color: #27ae60;
+        }
+        .quiz-item {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 5px solid #3498db;
+            border-radius: 4px;
+        }
+        .quiz-item .q-text {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .quiz-item input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .action-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        #submit-btn {
+            background-color: #e67e22;
+            font-size: 18px;
+            padding: 12px 30px;
+        }
+        #submit-btn:hover {
+            background-color: #d35400;
+        }
+        .result-section {
+            margin-top: 10px;
+            padding: 10px;
+            background: #edf2f7;
+            border-radius: 4px;
+            display: none;
+        }
+        .correct-ans {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .user-ans {
+            color: #555;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>114-2 職二段三手寫複習卷</h1>
+    <p style="text-align: center; color: #7f8c8d;">請選擇你想複習的題型（點選後將會自動隨機出題）：</p>
+    
+    <div class="menu-section">
+        <button onclick="startQuiz('國字注音', this)">1. 國字注音</button>
+        <button onclick="startQuiz('注釋', this)">2. 注釋</button>
+        <button onclick="startQuiz('默書', this)">3. 默書</button>
+    </div>
+
+    <div id="quiz-area"></div>
+
+    <div class="action-section" id="action-area" style="display: none;">
+        <button id="submit-btn" onclick="showAnswers()">看答案 / 核對結果</button>
+    </div>
+</div>
+
+<script>
+    let allData = {};
+    let currentPool = [];
+
+    // 模擬讀取剛剛 python 輸出的 JSON 內容
+    // 因為瀏覽器安全限制直接兩下點開 HTML 無法讀取外部本地 JSON，
+    // 這裡我們直接利用 fetch 讀取，建議用簡易伺服器打開，或是直接把 json 內容貼進來。
+    // 為了讓你最方便開箱即用，你可以把 python 產生的 json 內容直接覆蓋到下面的 fetch 失敗備份區。
+    
+    async function loadData() {
+        try {
+            const response = await fetch('quiz_data.json');
+            allData = await response.json();
+        } catch (e) {
+            console.log("正在嘗試尋找本地 quiz_data.json...");
+            alert("請確保你已經執行過 python 檔案生成了 quiz_data.json！\n如果是直接雙擊打開 HTML 檔，請用 Live Server 或 Python 建立簡易本地伺服器。");
+        }
+    }
+
+    // 隨機打亂陣列的函式 (Fisher-Yates Shuffle)
+    def shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function startQuiz(type, btnComponent) {
+        // 切換按鈕高亮
+        const buttons = document.querySelectorAll('.menu-section button');
+        buttons.forEach(b => b.classList.remove('active'));
+        btnComponent.classList.add('active');
+
+        if (!allData[type] || allData[type].length === 0) {
+            alert("找不到該題型資料，請確認 json 檔是否正確。");
+            return;
+        }
+
+        // 複製一份題目出來打亂，不影響原始 JSON 資料
+        currentPool = JSON.parse(JSON.stringify(allData[type]));
+        shuffle(currentPool);
+
+        const quizArea = document.getElementById('quiz-area');
+        quizArea.innerHTML = ''; // 清空舊題目
+
+        // 渲染新隨機順序的題目
+        currentPool.forEach((item, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'quiz-item';
+            itemDiv.innerHTML = `
+                <div class="q-text">第 ${index + 1} 題：${item.question}</div>
+                <input type="text" id="input-${index}" placeholder="請在此輸入你的答案..." autocomplete="off">
+                <div class="result-section" id="result-${index}">
+                    <div class="user-ans">你的回答：<span id="user-text-${index}"></span></div>
+                    <div class="correct-ans">正確答案：${item.answer}</div>
+                </div>
+            `;
+            quizArea.appendChild(itemDiv);
+        });
+
+        // 顯示提交按鈕
+        document.getElementById('action-area').style.display = 'block';
+        // 滾動到題目區
+        quizArea.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function showAnswers() {
+        currentPool.forEach((item, index) => {
+            const userInput = document.getElementById(`input-${index}`).value;
+            // 把使用者的答案塞進結果區
+            document.getElementById(`user-text-${index}`).innerText = userInput || "(未填寫)";
+            // 秀出結果區（包含原本題目、你填的答案與正確答案）
+            document.getElementById(`result-${index}`).style.display = 'block';
+        });
+        
+        // 提示使用者對答案
+        alert("已為您揭曉答案！請對照下方顯示的正確答案進行自我核對。");
+    }
+
+    // 初始化讀取資料
+    loadData();
+</script>
+
+</body>
+</html>
